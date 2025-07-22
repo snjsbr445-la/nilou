@@ -14,12 +14,11 @@ from datetime import datetime
 import pytz
 import os
 
-# --- আপনার ব্যক্তিগত তথ্য ---
+# --- ব্যক্তিগত তথ্য ---
 IVASMS_EMAIL = "niloyg822@gmail.com"
 IVASMS_PASSWORD = "N81234567"
 TELEGRAM_TOKEN = "7549134101:AAFtBzB1gJ1hXj18zHLVTXQvtM3gZlkOvpw"
 TELEGRAM_CHAT_ID = "-1002819267399"
-BOT_NAME = "NILOY OTP"
 ADMIN_USER_ID = 7052442701
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -67,8 +66,7 @@ def otp_collector(driver, sent_messages):
                     os._exit(1)
             except Exception:
                 os._exit(1)
-            time.sleep(2)
-        time.sleep(0.1)
+        time.sleep(0.01)  # আরও দ্রুত চেক করার জন্য (১০ মিলিসেকেন্ডে একবার)
 
 def telegram_sender():
     logging.info("✅ টেলিগ্রাম প্রেরক চালু হয়েছে।")
@@ -81,7 +79,15 @@ def telegram_sender():
             tz = pytz.timezone('Asia/Dhaka')
             current_time = datetime.now(tz).strftime('%d/%m/%Y, %I:%M:%S %p')
             escaped_message = html.escape(message_content)
-            formatted_msg = (f"<b>{BOT_NAME}</b>\n✨ <b>OTP Received</b> ✨\n\n⏰ <b>Time:</b> {current_time}\n📞 <b>Number:</b> <code>{item['number']}</code>\n🔧 <b>Service:</b> {item['service']}\n🔑 <b>OTP Code:</b> <code>{otp_code}</code>\n\n<blockquote>{escaped_message}</blockquote>")
+            formatted_msg = (
+                f"<b>ONLY NUMBER</b>\n"
+                f"✨ <b>OTP Received</b> ✨\n\n"
+                f"⏰ <b>Time:</b> {current_time}\n"
+                f"📞 <b>Number:</b> <code>{item['number']}</code>\n"
+                f"🔧 <b>Service:</b> <code>{item['service']}</code>\n"
+                f"🔑 <b>OTP Code:</b> <code>{otp_code}</code>\n\n"
+                f"<blockquote>{escaped_message}</blockquote>"
+            )
             send_to_telegram(formatted_msg, TELEGRAM_CHAT_ID)
         except Exception as e:
             logging.error(f"টেলিগ্রামে মেসেজ পাঠাতে গিয়ে সমস্যা: {e}")
@@ -102,20 +108,23 @@ def start_bot():
         if "login" in driver.current_url:
             raise Exception("iVASMS-এ লগইন ব্যর্থ।")
         logging.info("✅ iVASMS-এ সফলভাবে লগইন করা হয়েছে।")
-        send_to_telegram(f"<b>{BOT_NAME} BOT</b>\n🚀 <i>বট সফলভাবে চালু হয়েছে...</i>", ADMIN_USER_ID)
+        send_to_telegram("🚀 <b>ONLY NUMBER BOT</b>\n<i>বট সফলভাবে চালু হয়েছে...</i>", ADMIN_USER_ID)
         driver.get("https://www.ivasms.com/portal/live/my_sms")
         logging.info("👀 OTP পেজ পর্যবেক্ষণ শুরু হচ্ছে...")
         sent_messages = set()
         collector_thread = Thread(target=otp_collector, args=(driver, sent_messages), daemon=True)
         collector_thread.start()
-        sender_thread = Thread(target=telegram_sender, daemon=True)
-        sender_thread.start()
+
+        # একসাথে ৫টি Sender Thread চালু
+        for _ in range(5):
+            sender_thread = Thread(target=telegram_sender, daemon=True)
+            sender_thread.start()
+
         collector_thread.join()
-        sender_thread.join()
     except Exception as e:
         error_details = traceback.format_exc()
         logging.critical(f"বট একটি মারাত্মক ত্রুটির কারণে বন্ধ হয়ে গেছে: {e}\n{error_details}")
-        send_to_telegram(f"<b>{BOT_NAME} BOT</b>\n🐞 **বট ক্র্যাশ করেছে!**\n\n**কারণ:**\n`{e}`", ADMIN_USER_ID)
+        send_to_telegram(f"🐞 <b>ONLY NUMBER BOT ক্র্যাশ করেছে!</b>\n\n<b>কারণ:</b>\n<code>{e}</code>", ADMIN_USER_ID)
     finally:
         if driver:
             driver.quit()
