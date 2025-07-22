@@ -21,6 +21,18 @@ TELEGRAM_TOKEN = "7549134101:AAFtBzB1gJ1hXj18zHLVTXQvtM3gZlkOvpw"
 TELEGRAM_CHAT_ID = "-1002819267399"
 ADMIN_USER_ID = 7052442701
 
+# --- log filtering system ---
+def safe_log(msg, level="info"):
+    skip_keywords = ["https://", "OTP found", "Sending OTP to Telegram"]
+    if any(keyword in msg for keyword in skip_keywords):
+        return
+    if level == "info":
+        logging.info(msg)
+    elif level == "error":
+        logging.error(msg)
+    elif level == "critical":
+        logging.critical(msg)
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 otp_queue = Queue()
 
@@ -30,7 +42,7 @@ def send_to_telegram(message, chat_id):
     try:
         requests.post(url, json=payload, timeout=10)
     except Exception as e:
-        logging.error(f"টেলিগ্রামে বার্তা পাঠাতে ব্যর্থ: {e}")
+        safe_log(f"টেলিগ্রামে বার্তা পাঠাতে ব্যর্থ: {e}", level="error")
 
 def create_driver():
     chrome_options = Options()
@@ -41,7 +53,7 @@ def create_driver():
     return driver
 
 def otp_collector(driver, sent_messages):
-    logging.info("✅ OTP সংগ্রহকারী চালু হয়েছে।")
+    safe_log("✅ OTP সংগ্রহকারী চালু হয়েছে।")
     while True:
         try:
             all_rows = driver.find_elements(By.CSS_SELECTOR, "tbody > tr")
@@ -59,17 +71,17 @@ def otp_collector(driver, sent_messages):
                 except Exception:
                     continue
         except Exception as e:
-            logging.error(f"OTP সংগ্রহ করতে গিয়ে সমস্যা: {e}")
+            safe_log(f"OTP সংগ্রহ করতে গিয়ে সমস্যা: {e}", level="error")
             try:
                 if "login" in driver.current_url:
-                    logging.critical("iVASMS সেশন শেষ। বট বন্ধ হচ্ছে।")
+                    safe_log("iVASMS সেশন শেষ। বট বন্ধ হচ্ছে।", level="critical")
                     os._exit(1)
             except Exception:
                 os._exit(1)
-        time.sleep(0.01)  # আরও দ্রুত চেক করার জন্য (১০ মিলিসেকেন্ডে একবার)
+        time.sleep(0.01)
 
 def telegram_sender():
-    logging.info("✅ টেলিগ্রাম প্রেরক চালু হয়েছে।")
+    safe_log("✅ টেলিগ্রাম প্রেরক চালু হয়েছে।")
     while True:
         item = otp_queue.get()
         try:
@@ -89,14 +101,14 @@ def telegram_sender():
             )
             send_to_telegram(formatted_msg, TELEGRAM_CHAT_ID)
         except Exception as e:
-            logging.error(f"টেলিগ্রামে মেসেজ পাঠাতে গিয়ে সমস্যা: {e}")
+            safe_log(f"টেলিগ্রামে মেসেজ পাঠাতে গিয়ে সমস্যা: {e}", level="error")
         finally:
             otp_queue.task_done()
 
 def start_bot():
     driver = None
     try:
-        logging.info("বট চালু হচ্ছে...")
+        safe_log("বট চালু হচ্ছে...")
         driver = create_driver()
         driver.get("https://www.ivasms.com/login")
         time.sleep(3)
@@ -106,15 +118,14 @@ def start_bot():
         time.sleep(5)
         if "login" in driver.current_url:
             raise Exception("iVASMS-এ লগইন ব্যর্থ।")
-        logging.info("✅ iVASMS-এ সফলভাবে লগইন করা হয়েছে।")
-        send_to_telegram("🚀 <b>ONLY NUMBER BOT</b>\n<i>বট সফলভাবে চালু হয়েছে...</i>", ADMIN_USER_ID)
+        safe_log("✅ iVASMS-এ সফলভাবে লগইন করা হয়েছে।")
+
         driver.get("https://www.ivasms.com/portal/live/my_sms")
-        logging.info("👀 OTP পেজ পর্যবেক্ষণ শুরু হচ্ছে...")
+        safe_log("👀 OTP পেজ পর্যবেক্ষণ শুরু হচ্ছে...")
         sent_messages = set()
         collector_thread = Thread(target=otp_collector, args=(driver, sent_messages), daemon=True)
         collector_thread.start()
 
-        # একসাথে ৫টি Sender Thread চালু
         for _ in range(5):
             sender_thread = Thread(target=telegram_sender, daemon=True)
             sender_thread.start()
@@ -122,12 +133,12 @@ def start_bot():
         collector_thread.join()
     except Exception as e:
         error_details = traceback.format_exc()
-        logging.critical(f"বট একটি মারাত্মক ত্রুটির কারণে বন্ধ হয়ে গেছে: {e}\n{error_details}")
+        safe_log(f"বট একটি মারাত্মক ত্রুটির কারণে বন্ধ হয়ে গেছে: {e}\n{error_details}", level="critical")
         send_to_telegram(f"🐞 <b>ONLY NUMBER BOT ক্র্যাশ করেছে!</b>\n\n<b>কারণ:</b>\n<code>{e}</code>", ADMIN_USER_ID)
     finally:
         if driver:
             driver.quit()
-        logging.info("বট সম্পূর্ণভাবে বন্ধ।")
+        safe_log("বট সম্পূর্ণভাবে বন্ধ।")
 
 if __name__ == "__main__":
     keep_alive()
