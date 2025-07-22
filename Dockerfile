@@ -5,7 +5,6 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # Install system dependencies required by Selenium and Chrome
-# This installs wget and gnupg which are needed for adding Chrome's repository
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
@@ -28,9 +27,10 @@ COPY requirements.txt .
 # Install any needed Python packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application's code (main.py, keep_alive.py) into the container
+# Copy the rest of the application's code into the container
 COPY . .
 
 # --- FINAL AND CORRECT COMMAND ---
-# This command runs your main Python script, which starts everything.
-CMD ["python", "main.py"]
+# Render এর চাহিদা অনুযায়ী পোর্ট 8080 ব্যবহার করা হচ্ছে
+# এবং gunicorn কে আপনার keep_alive ফাইলটি চালানোর জন্য নির্দেশ দেওয়া হচ্ছে
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "keep_alive:app"]
