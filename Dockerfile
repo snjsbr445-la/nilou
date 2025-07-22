@@ -14,6 +14,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# gunicorn কে আপনার keep_alive ফাইলটি চালানোর জন্য নির্দেশ দেওয়া হচ্ছে
-# এই লাইনটি আপনার keep_alive সার্ভারকে Render-এ চালু করবে
-CMD ["gunicorn", "--bind", "0.0.0.0:10000", "keep_alive:app"]
+# Gunicorn দিয়ে Flask চালাবে, কিন্তু log-level কমিয়ে দিবে
+CMD ["gunicorn", "--bind", "0.0.0.0:10000", "--log-level", "critical", "--access-logfile", "/dev/null", "--error-logfile", "/dev/null", "keep_alive:app"]
