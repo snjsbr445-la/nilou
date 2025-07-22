@@ -80,7 +80,6 @@ def telegram_sender():
             current_time = datetime.now(tz).strftime('%d/%m/%Y, %I:%M:%S %p')
             escaped_message = html.escape(message_content)
             formatted_msg = (
-            
                 f"✨ <b>OTP Received</b> ✨\n\n"
                 f"⏰ <b>Time:</b> {current_time}\n"
                 f"📞 <b>Number:</b> <code>{item['number']}</code>\n"
