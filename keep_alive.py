@@ -8,15 +8,15 @@ log.setLevel(logging.ERROR)
 
 app = Flask('')
 
-@app.route('/')
+# Render এর Health Check Path অনুযায়ী এটি পরিবর্তন করা হয়েছে
+@app.route('/ping')
 def home():
-    # এই ফাংশনটি এখন কোনো লগ প্রিন্ট করবে না, শুধু একটি উত্তর পাঠাবে
     return "I'm alive"
 
 def run():
-  # Dockerfile অনুযায়ী পোর্ট 10000 ব্যবহার করা হচ্ছে
-  app.run(host='0.0.0.0',port=10000)
+  # Dockerfile এখন পোর্ট নিয়ন্ত্রণ করবে, তাই এখানে পোর্ট নির্দিষ্ট করার প্রয়োজন নেই
+  app.run(host='0.0.0.0')
 
 def keep_alive():
     t = Thread(target=run)
-    t.start()
+    t.start()```
