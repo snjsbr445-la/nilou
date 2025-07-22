@@ -2,4 +2,4 @@ selenium
 requests
 pytz
 Flask
-gunicorn
+selenium requests pytz Flask
