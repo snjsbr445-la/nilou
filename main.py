@@ -21,12 +21,7 @@ TELEGRAM_TOKEN = "7549134101:AAFtBzB1gJ1hXj18zHLVTXQvtM3gZlkOvpw"
 TELEGRAM_CHAT_ID = "-1002819267399"
 ADMIN_USER_ID = 7052442701
 
-# --- লগিং কনফিগারেশন ---
-# Render-এর পরিবেশগত ভেরিয়েবল থেকে লগ লেভেল নেওয়া হবে।
-# যদি LOG_LEVEL সেট করা না থাকে, তবে ডিফল্ট হিসেবে INFO ব্যবহার করা হবে।
-log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()
-logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(message)s")
-
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 otp_queue = Queue()
 
 def send_to_telegram(message, chat_id):
@@ -46,7 +41,7 @@ def create_driver():
     return driver
 
 def otp_collector(driver, sent_messages):
-    logging.info("✅ OTP সংগ্রহকারী চালু হয়েছে।") # এই লগটি এখন আর দেখাবে না
+    logging.info("✅ OTP সংগ্রহকারী চালু হয়েছে।")
     while True:
         try:
             all_rows = driver.find_elements(By.CSS_SELECTOR, "tbody > tr")
@@ -71,10 +66,10 @@ def otp_collector(driver, sent_messages):
                     os._exit(1)
             except Exception:
                 os._exit(1)
-        time.sleep(0.01)
+        time.sleep(0.01)  # আরও দ্রুত চেক করার জন্য (১০ মিলিসেকেন্ডে একবার)
 
 def telegram_sender():
-    logging.info("✅ টেলিগ্রাম প্রেরক চালু হয়েছে।") # এই লগটিও এখন আর দেখাবে না
+    logging.info("✅ টেলিগ্রাম প্রেরক চালু হয়েছে।")
     while True:
         item = otp_queue.get()
         try:
@@ -88,12 +83,10 @@ def telegram_sender():
                 f"✨ <b>OTP Received</b> ✨\n\n"
                 f"⏰ <b>Time:</b> {current_time}\n"
                 f"📞 <b>Number:</b> <code>{item['number']}</code>\n"
-                f"🔧 <b>Service:</b> <code>{item['service']}</code>\n\n"
+                f"🔧 <b>Service:</b> <code>{item['service']}</code>\n"
+                f"🔑 <b>OTP Code:</b> <code>{otp_code}</code>\n\n"
                 f"<blockquote>{escaped_message}</blockquote>"
             )
-            # শুধুমাত্র OTP কোড আলাদাভাবে পাঠানোর জন্য নিচের লাইনটি যোগ করা হয়েছে
-            send_to_telegram(f"🔑 <b>OTP Code:</b> <code>{otp_code}</code>", TELEGRAM_CHAT_ID)
-            # সম্পূর্ণ মেসেজটি আগের মতোই যাবে
             send_to_telegram(formatted_msg, TELEGRAM_CHAT_ID)
         except Exception as e:
             logging.error(f"টেলিগ্রামে মেসেজ পাঠাতে গিয়ে সমস্যা: {e}")
@@ -103,7 +96,7 @@ def telegram_sender():
 def start_bot():
     driver = None
     try:
-        logging.info("বট চালু হচ্ছে...") # এটিও আর দেখাবে না
+        logging.info("বট চালু হচ্ছে...")
         driver = create_driver()
         driver.get("https://www.ivasms.com/login")
         time.sleep(3)
@@ -113,10 +106,12 @@ def start_bot():
         time.sleep(5)
         if "login" in driver.current_url:
             raise Exception("iVASMS-এ লগইন ব্যর্থ।")
-        logging.info("✅ iVASMS-এ সফলভাবে লগইন করা হয়েছে।") # এটিও আর দেখাবে না
+        logging.info("✅ iVASMS-এ সফলভাবে লগইন করা হয়েছে।")
+
+        # 🔴 এখানে ONLY NUMBER BOT মেসেজ লাইন বাদ দেওয়া হয়েছে
 
         driver.get("https://www.ivasms.com/portal/live/my_sms")
-        logging.info("👀 OTP পেজ পর্যবেক্ষণ শুরু হচ্ছে...") # এটিও আর দেখাবে না
+        logging.info("👀 OTP পেজ পর্যবেক্ষণ শুরু হচ্ছে...")
         sent_messages = set()
         collector_thread = Thread(target=otp_collector, args=(driver, sent_messages), daemon=True)
         collector_thread.start()
