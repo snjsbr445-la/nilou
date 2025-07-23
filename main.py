@@ -21,19 +21,12 @@ TELEGRAM_TOKEN = "7549134101:AAFtBzB1gJ1hXj18zHLVTXQvtM3gZlkOvpw"
 TELEGRAM_CHAT_ID = "-1002819267399"
 ADMIN_USER_ID = 7052442701
 
-# --- log filtering system ---
-def safe_log(msg, level="info"):
-    skip_keywords = ["https://", "OTP found", "Sending OTP to Telegram"]
-    if any(keyword in msg for keyword in skip_keywords):
-        return
-    if level == "info":
-        logging.info(msg)
-    elif level == "error":
-        logging.error(msg)
-    elif level == "critical":
-        logging.critical(msg)
+# --- লগিং কনফিগারেশন ---
+# Render-এর পরিবেশগত ভেরিয়েবল থেকে লগ লেভেল নেওয়া হবে।
+# যদি LOG_LEVEL সেট করা না থাকে, তবে ডিফল্ট হিসেবে INFO ব্যবহার করা হবে।
+log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()
+logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(message)s")
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 otp_queue = Queue()
 
 def send_to_telegram(message, chat_id):
@@ -42,7 +35,7 @@ def send_to_telegram(message, chat_id):
     try:
         requests.post(url, json=payload, timeout=10)
     except Exception as e:
-        safe_log(f"টেলিগ্রামে বার্তা পাঠাতে ব্যর্থ: {e}", level="error")
+        logging.error(f"টেলিগ্রামে বার্তা পাঠাতে ব্যর্থ: {e}")
 
 def create_driver():
     chrome_options = Options()
@@ -53,7 +46,7 @@ def create_driver():
     return driver
 
 def otp_collector(driver, sent_messages):
-    safe_log("✅ OTP সংগ্রহকারী চালু হয়েছে।")
+    logging.info("✅ OTP সংগ্রহকারী চালু হয়েছে।") # এই লগটি এখন আর দেখাবে না
     while True:
         try:
             all_rows = driver.find_elements(By.CSS_SELECTOR, "tbody > tr")
@@ -71,17 +64,17 @@ def otp_collector(driver, sent_messages):
                 except Exception:
                     continue
         except Exception as e:
-            safe_log(f"OTP সংগ্রহ করতে গিয়ে সমস্যা: {e}", level="error")
+            logging.error(f"OTP সংগ্রহ করতে গিয়ে সমস্যা: {e}")
             try:
                 if "login" in driver.current_url:
-                    safe_log("iVASMS সেশন শেষ। বট বন্ধ হচ্ছে।", level="critical")
+                    logging.critical("iVASMS সেশন শেষ। বট বন্ধ হচ্ছে।")
                     os._exit(1)
             except Exception:
                 os._exit(1)
         time.sleep(0.01)
 
 def telegram_sender():
-    safe_log("✅ টেলিগ্রাম প্রেরক চালু হয়েছে।")
+    logging.info("✅ টেলিগ্রাম প্রেরক চালু হয়েছে।") # এই লগটিও এখন আর দেখাবে না
     while True:
         item = otp_queue.get()
         try:
@@ -95,20 +88,22 @@ def telegram_sender():
                 f"✨ <b>OTP Received</b> ✨\n\n"
                 f"⏰ <b>Time:</b> {current_time}\n"
                 f"📞 <b>Number:</b> <code>{item['number']}</code>\n"
-                f"🔧 <b>Service:</b> <code>{item['service']}</code>\n"
-                f"🔑 <b>OTP Code:</b> <code>{otp_code}</code>\n\n"
+                f"🔧 <b>Service:</b> <code>{item['service']}</code>\n\n"
                 f"<blockquote>{escaped_message}</blockquote>"
             )
+            # শুধুমাত্র OTP কোড আলাদাভাবে পাঠানোর জন্য নিচের লাইনটি যোগ করা হয়েছে
+            send_to_telegram(f"🔑 <b>OTP Code:</b> <code>{otp_code}</code>", TELEGRAM_CHAT_ID)
+            # সম্পূর্ণ মেসেজটি আগের মতোই যাবে
             send_to_telegram(formatted_msg, TELEGRAM_CHAT_ID)
         except Exception as e:
-            safe_log(f"টেলিগ্রামে মেসেজ পাঠাতে গিয়ে সমস্যা: {e}", level="error")
+            logging.error(f"টেলিগ্রামে মেসেজ পাঠাতে গিয়ে সমস্যা: {e}")
         finally:
             otp_queue.task_done()
 
 def start_bot():
     driver = None
     try:
-        safe_log("বট চালু হচ্ছে...")
+        logging.info("বট চালু হচ্ছে...") # এটিও আর দেখাবে না
         driver = create_driver()
         driver.get("https://www.ivasms.com/login")
         time.sleep(3)
@@ -118,10 +113,10 @@ def start_bot():
         time.sleep(5)
         if "login" in driver.current_url:
             raise Exception("iVASMS-এ লগইন ব্যর্থ।")
-        safe_log("✅ iVASMS-এ সফলভাবে লগইন করা হয়েছে।")
+        logging.info("✅ iVASMS-এ সফলভাবে লগইন করা হয়েছে।") # এটিও আর দেখাবে না
 
         driver.get("https://www.ivasms.com/portal/live/my_sms")
-        safe_log("👀 OTP পেজ পর্যবেক্ষণ শুরু হচ্ছে...")
+        logging.info("👀 OTP পেজ পর্যবেক্ষণ শুরু হচ্ছে...") # এটিও আর দেখাবে না
         sent_messages = set()
         collector_thread = Thread(target=otp_collector, args=(driver, sent_messages), daemon=True)
         collector_thread.start()
@@ -133,12 +128,12 @@ def start_bot():
         collector_thread.join()
     except Exception as e:
         error_details = traceback.format_exc()
-        safe_log(f"বট একটি মারাত্মক ত্রুটির কারণে বন্ধ হয়ে গেছে: {e}\n{error_details}", level="critical")
+        logging.critical(f"বট একটি মারাত্মক ত্রুটির কারণে বন্ধ হয়ে গেছে: {e}\n{error_details}")
         send_to_telegram(f"🐞 <b>ONLY NUMBER BOT ক্র্যাশ করেছে!</b>\n\n<b>কারণ:</b>\n<code>{e}</code>", ADMIN_USER_ID)
     finally:
         if driver:
             driver.quit()
-        safe_log("বট সম্পূর্ণভাবে বন্ধ।")
+        logging.info("বট সম্পূর্ণভাবে বন্ধ।")
 
 if __name__ == "__main__":
     keep_alive()
